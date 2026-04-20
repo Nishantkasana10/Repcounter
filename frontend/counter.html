@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rep Counter</title>
+    <link rel="stylesheet" href="css/counter.css">
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <a href="index.html" class="back-btn">← BACK</a>
+        <div class="exercise-title" id="exercise-title">LOADING...</div>
+        <div></div>
+    </div>
+
+    <!-- MAIN LAYOUT -->
+    <div class="main">
+
+        <!-- CAMERA -->
+        <div class="camera-box">
+            <video id="video" autoplay muted playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div class="camera-overlay" id="cam-overlay">
+                <p>CAMERA OFF</p>
+            </div>
+            <div class="cam-status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">waiting...</span>
+            </div>
+        </div>
+
+        <!-- SIDE PANEL -->
+        <div class="side-panel">
+
+            <!-- Count -->
+            <div class="stat-card">
+                <div class="stat-label">Reps</div>
+                <div class="stat-value" id="count-display">0</div>
+            </div>
+
+            <!-- Timer -->
+            <div class="stat-card">
+                <div class="stat-label">Time</div>
+                <div class="stat-value small" id="timer-display">0:00</div>
+            </div>
+
+            <!-- Sensitivity -->
+            <div class="stat-card">
+                <div class="stat-label">Sensitivity</div>
+                <div class="sens-row">
+                    <span class="sens-label">Low</span>
+                    <input type="range" id="sens-slider" min="1" max="10" value="5"
+                        oninput="updateSensitivity(this.value)">
+                    <span class="sens-val" id="sens-val">5</span>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <button class="btn btn-primary" id="start-btn" onclick="startSession()">
+                START CAMERA
+            </button>
+            <button class="btn" id="reset-btn" onclick="resetSession()" disabled>
+                RESET
+            </button>
+
+        </div>
+    </div>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+
+    <!-- Our JS files -->
+    <script src="js/exercises/jumprope.js"></script>
+    <script src="js/exercises/pushup.js"></script>
+    <script src="js/exercises/squat.js"></script>
+    <script src="js/exercises/jumpingjack.js"></script>
+    <script src="js/counter.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rep Counter</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <h1>REP COUNTER</h1>
+        <p>AI powered fitness tracker</p>
+    </header>
+
+    <!-- EXERCISE CARDS -->
+    <main>
+        <h2>Choose your exercise</h2>
+        <div class="exercise-grid">
+
+            <div class="card" onclick="startExercise('jumprope')">
+                <div class="card-icon">🪢</div>
+                <div class="card-name">Jump Rope</div>
+            </div>
+
+            <div class="card" onclick="startExercise('pushup')">
+                <div class="card-icon">💪</div>
+                <div class="card-name">Push Ups</div>
+            </div>
+
+            <div class="card" onclick="startExercise('squat')">
+                <div class="card-icon">🏋️</div>
+                <div class="card-name">Squats</div>
+            </div>
+
+            <div class="card" onclick="startExercise('jumpingjack')">
+                <div class="card-icon">⭐</div>
+                <div class="card-name">Jumping Jacks</div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="js/main.js"></script>
+
+</body>
+</html>
