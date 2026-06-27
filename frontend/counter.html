@@ -15,6 +15,12 @@
         <div></div>
     </div>
 
+    <!-- MODE TOGGLE -->
+    <div class="mode-toggle">
+        <button class="mode-btn active" id="btn-free" onclick="setMode('free')">FREE COUNT</button>
+        <button class="mode-btn" id="btn-timed" onclick="setMode('timed')">1 MIN CHALLENGE</button>
+    </div>
+
     <!-- MAIN LAYOUT -->
     <div class="main">
 
@@ -34,16 +40,28 @@
         <!-- SIDE PANEL -->
         <div class="side-panel">
 
-            <!-- Count -->
+            <!-- Reps count -->
             <div class="stat-card">
                 <div class="stat-label">Reps</div>
                 <div class="stat-value" id="count-display">0</div>
             </div>
 
-            <!-- Timer -->
-            <div class="stat-card">
+            <!-- Timer — only shows in timed mode -->
+            <div class="stat-card" id="timer-card" style="display:none">
+                <div class="stat-label">Time Left</div>
+                <div class="stat-value small" id="timer-display">1:00</div>
+            </div>
+
+            <!-- Elapsed time — shows in free mode -->
+            <div class="stat-card" id="elapsed-card">
                 <div class="stat-label">Time</div>
-                <div class="stat-value small" id="timer-display">0:00</div>
+                <div class="stat-value small" id="elapsed-display">0:00</div>
+            </div>
+
+            <!-- Best this session -->
+            <div class="stat-card" id="best-card" style="display:none">
+                <div class="stat-label">Personal Best</div>
+                <div class="stat-value small" id="best-display">—</div>
             </div>
 
             <!-- Sensitivity -->
@@ -57,10 +75,12 @@
                 </div>
             </div>
 
-            <!-- Buttons -->
-            <button class="btn btn-primary" id="start-btn" onclick="startSession()">
+            <!-- START/STOP button -->
+            <button class="btn btn-primary" id="main-btn" onclick="handleMainButton()">
                 START CAMERA
             </button>
+
+            <!-- RESET button -->
             <button class="btn" id="reset-btn" onclick="resetSession()" disabled>
                 RESET
             </button>
@@ -68,15 +88,29 @@
         </div>
     </div>
 
+    <!-- FINISH OVERLAY — shows when 1 min ends -->
+    <div id="finish-overlay">
+        <div class="finish-label">Session Complete!</div>
+        <div class="finish-score" id="finish-score">0</div>
+        <div class="finish-sub" id="finish-sub">reps completed</div>
+        <div class="finish-best" id="finish-best"></div>
+        <div class="finish-actions">
+            <button class="btn btn-primary" onclick="tryAgain()">TRY AGAIN</button>
+            <button class="btn" onclick="closeOverlay()">CLOSE</button>
+        </div>
+    </div>
+
     <!-- MediaPipe -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 
-    <!-- Our JS files -->
+    <!-- Exercise files -->
     <script src="js/exercises/jumprope.js"></script>
     <script src="js/exercises/pushup.js"></script>
     <script src="js/exercises/squat.js"></script>
     <script src="js/exercises/jumpingjack.js"></script>
+
+    <!-- Main logic -->
     <script src="js/counter.js"></script>
 
 </body>

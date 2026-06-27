@@ -1,38 +1,49 @@
 // ─────────────────────────────────────────
-// COUNTER.JS - the brain of the whole app
+// COUNTER.JS
+// Handles: camera, pose detection,
+//          counting, timer, modes
 // ─────────────────────────────────────────
 
-// Step 1 - figure out which exercise was clicked
-// When user clicks "Push Up" on home page, URL becomes:
-// counter.html?exercise=pushup
-// We read that "pushup" from the URL here
-const urlParams = new URLSearchParams(window.location.search);
+// ── Get exercise from URL ─────────────────
+const urlParams    = new URLSearchParams(window.location.search);
 const exerciseName = urlParams.get('exercise');
-
-// Step 2 - each exercise has its own config
-// We'll define these in each exercise JS file
-// For now set a default
 let exerciseConfig = null;
 
-// Step 3 - load the right exercise config
 window.onload = function() {
     if (exerciseName === 'jumprope')    exerciseConfig = getJumpRopeConfig();
     if (exerciseName === 'pushup')      exerciseConfig = getPushUpConfig();
     if (exerciseName === 'squat')       exerciseConfig = getSquatConfig();
     if (exerciseName === 'jumpingjack') exerciseConfig = getJumpingJackConfig();
 
-    // Show exercise name in top bar
     document.getElementById('exercise-title').textContent = exerciseConfig.name;
 }
 
-// ─────────────────────────────────────────
-// CAMERA + MEDIAPIPE SETUP
-// ─────────────────────────────────────────
-let camera = null;
-let pose = null;
-const video = document.getElementById('video');
+// ── Mode ──────────────────────────────────
+let mode = 'free'; // 'free' or 'timed'
+
+function setMode(m) {
+    // Don't switch mode while session is running
+    if (cameraStarted && counting) return;
+
+    mode = m;
+
+    document.getElementById('btn-free').classList.toggle('active', m === 'free');
+    document.getElementById('btn-timed').classList.toggle('active', m === 'timed');
+    document.getElementById('timer-card').style.display   = m === 'timed' ? '' : 'none';
+    document.getElementById('elapsed-card').style.display = m === 'free'  ? '' : 'none';
+    document.getElementById('best-card').style.display    = m === 'timed' ? '' : 'none';
+
+    resetSession();
+}
+
+// ── Camera + Pose ─────────────────────────
+let camera        = null;
+let pose          = null;
+let cameraStarted = false;
+
+const video  = document.getElementById('video');
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const ctx    = canvas.getContext('2d');
 
 async function initCamera() {
     document.getElementById('cam-overlay').style.display = 'none';
@@ -48,26 +59,21 @@ async function initCamera() {
         minTrackingConfidence: 0.5,
     });
 
-    // Every frame mediapipe detects pose → calls onPoseResults
     pose.onResults(onPoseResults);
 
     camera = new Camera(video, {
-        onFrame: async () => {
-            if (pose) await pose.send({ image: video });
-        },
+        onFrame: async () => { if (pose) await pose.send({ image: video }); },
         width: 640,
         height: 480
     });
 
     await camera.start();
+    cameraStarted = true;
     setStatus('detected', 'pose loading...');
 }
 
-// ─────────────────────────────────────────
-// EVERY FRAME THIS RUNS
-// ─────────────────────────────────────────
 function onPoseResults(results) {
-    canvas.width = video.videoWidth || 640;
+    canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -78,81 +84,192 @@ function onPoseResults(results) {
 
     setStatus('detected', counting ? 'tracking...' : 'pose found — press begin!');
 
-    // Pass landmarks to the current exercise
-    // Each exercise knows what to do with them
     if (counting && exerciseConfig) {
         exerciseConfig.detect(results.poseLandmarks, ctx, canvas);
     }
 }
 
-// ─────────────────────────────────────────
-// COUNTING
-// ─────────────────────────────────────────
-let skipCount = 0;
-let counting = false;
-let timerInterval = null;
-let secondsElapsed = 0;
+// ── State ─────────────────────────────────
+let repCount       = 0;
+let counting       = false;
+let elapsedSeconds = 0;
+let timerLeft      = 60;
+let elapsedInterval = null;
+let timerInterval   = null;
+let personalBest    = 0;
 
+// ── Count a rep (called from exercise files) ──
 function countRep() {
-    skipCount++;
+    repCount++;
     const el = document.getElementById('count-display');
-    el.textContent = skipCount;
+    el.textContent = repCount;
+    el.classList.remove('bump');
+    void el.offsetWidth; // force reflow so animation replays
+    el.classList.add('bump');
 }
 
-// ─────────────────────────────────────────
-// SESSION CONTROL
-// ─────────────────────────────────────────
-async function startSession() {
-    const btn = document.getElementById('start-btn');
+// ── Main button handler ───────────────────
+async function handleMainButton() {
+    const btn = document.getElementById('main-btn');
 
-    if (!camera) {
+    // Step 1 — first click starts camera
+    if (!cameraStarted) {
         btn.textContent = 'STARTING...';
-        btn.disabled = true;
-        await initCamera();
+        btn.disabled    = true;
+        try {
+            await initCamera();
+        } catch(e) {
+            alert('Could not access camera. Please allow camera permission.');
+            btn.textContent = 'START CAMERA';
+            btn.disabled    = false;
+            return;
+        }
         btn.textContent = 'BEGIN';
-        btn.disabled = false;
+        btn.disabled    = false;
         document.getElementById('reset-btn').disabled = false;
         return;
     }
 
-    // Reset count
-    skipCount = 0;
-    secondsElapsed = 0;
-    document.getElementById('count-display').textContent = '0';
-    document.getElementById('timer-display').textContent = '0:00';
+    // Step 2 — toggle start/stop
+    if (!counting) {
+        startCounting();
+    } else {
+        stopCounting();
+    }
+}
+
+function startCounting() {
+    // Reset numbers
+    repCount       = 0;
+    elapsedSeconds = 0;
+    timerLeft      = 60;
+
+    document.getElementById('count-display').textContent  = '0';
+    document.getElementById('elapsed-display').textContent = '0:00';
+    document.getElementById('timer-display').textContent  = '1:00';
 
     // Reset exercise state
     if (exerciseConfig) exerciseConfig.reset();
 
     counting = true;
-    btn.textContent = 'COUNTING...';
-    btn.disabled = true;
+    document.getElementById('main-btn').textContent = 'STOP';
+    document.getElementById('main-btn').style.background = '#ff4757';
+    document.getElementById('main-btn').style.borderColor = '#ff4757';
+    document.getElementById('reset-btn').disabled = false;
 
-    // Start timer
-    timerInterval = setInterval(() => {
-        secondsElapsed++;
-        const m = Math.floor(secondsElapsed / 60);
-        const s = secondsElapsed % 60;
-        document.getElementById('timer-display').textContent =
+    // Start elapsed timer (both modes show elapsed)
+    elapsedInterval = setInterval(() => {
+        elapsedSeconds++;
+        const m = Math.floor(elapsedSeconds / 60);
+        const s = elapsedSeconds % 60;
+        document.getElementById('elapsed-display').textContent =
             `${m}:${s.toString().padStart(2, '0')}`;
     }, 1000);
+
+    // Timed mode — countdown
+    if (mode === 'timed') {
+        timerInterval = setInterval(() => {
+            timerLeft--;
+            const m = Math.floor(timerLeft / 60);
+            const s = timerLeft % 60;
+            document.getElementById('timer-display').textContent =
+                `${m}:${s.toString().padStart(2, '0')}`;
+
+            if (timerLeft <= 0) {
+                finishTimedSession();
+            }
+        }, 1000);
+    }
 }
 
-function resetSession() {
+function stopCounting() {
     counting = false;
+    clearInterval(elapsedInterval);
     clearInterval(timerInterval);
-    skipCount = 0;
-    secondsElapsed = 0;
-    document.getElementById('count-display').textContent = '0';
-    document.getElementById('timer-display').textContent = '0:00';
-    document.getElementById('start-btn').textContent = camera ? 'BEGIN' : 'START CAMERA';
-    document.getElementById('start-btn').disabled = false;
-    if (exerciseConfig) exerciseConfig.reset();
+
+    document.getElementById('main-btn').textContent   = 'BEGIN';
+    document.getElementById('main-btn').style.background  = '';
+    document.getElementById('main-btn').style.borderColor = '';
 }
 
-// ─────────────────────────────────────────
-// SENSITIVITY + STATUS
-// ─────────────────────────────────────────
+function finishTimedSession() {
+    stopCounting();
+
+    // Check personal best
+    const isNewBest = repCount > personalBest;
+    if (isNewBest) personalBest = repCount;
+
+    document.getElementById('best-display').textContent = personalBest;
+
+    // Show finish overlay
+    document.getElementById('finish-score').textContent = repCount;
+    document.getElementById('finish-sub').textContent   = 'reps in 60 seconds';
+    document.getElementById('finish-best').textContent  =
+        isNewBest ? '🏆 NEW PERSONAL BEST!' : `Personal best: ${personalBest}`;
+
+    document.getElementById('finish-overlay').classList.add('show');
+
+    // Save to backend
+    saveWorkout();
+}
+
+function tryAgain() {
+    closeOverlay();
+    setTimeout(() => startCounting(), 100);
+}
+
+function closeOverlay() {
+    document.getElementById('finish-overlay').classList.remove('show');
+}
+
+// ── Reset ─────────────────────────────────
+function resetSession() {
+    stopCounting();
+
+    repCount       = 0;
+    elapsedSeconds = 0;
+    timerLeft      = 60;
+
+    document.getElementById('count-display').textContent   = '0';
+    document.getElementById('elapsed-display').textContent = '0:00';
+    document.getElementById('timer-display').textContent   = '1:00';
+    document.getElementById('finish-overlay').classList.remove('show');
+
+    if (exerciseConfig) exerciseConfig.reset();
+
+    const btn = document.getElementById('main-btn');
+    btn.textContent   = cameraStarted ? 'BEGIN' : 'START CAMERA';
+    btn.style.background  = '';
+    btn.style.borderColor = '';
+
+    document.getElementById('reset-btn').disabled = !cameraStarted;
+}
+
+// ── Save workout to Python backend ────────
+async function saveWorkout() {
+    try {
+        const response = await fetch('http://localhost:5000/save-workout', {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body   : JSON.stringify({
+                exercise: exerciseName,
+                reps    : repCount,
+                duration: elapsedSeconds
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            console.log('Workout saved!', result.summary);
+        }
+    } catch(err) {
+        // Backend not running — that's okay, JS still works
+        console.log('Backend not available, workout not saved');
+    }
+}
+
+// ── Sensitivity + Status ──────────────────
 let sensitivity = 5;
 
 function updateSensitivity(v) {
